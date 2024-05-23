@@ -1,7 +1,12 @@
 from markdownify import markdownify as md
+from wikipedia import wikipedia as wiki
+from dotenv import load_dotenv
 
+import replicate
 import requests
 import mdv
+
+load_dotenv()
 
 class WikiResult:
     def __init__(self, pageid, title, description):
@@ -27,13 +32,14 @@ class WikiSearch:
         json_data = resp.json()
 
         pages = json_data["query"]["pages"]
-        print(pages)
 
         for key in pages:
             if pages[key]['pageid'] == -1:
                 print("No results found.")
                 return
-            result = WikiResult(key, pages[key]['title'], pages[key]['description'])
+            page = pages[key]
+            description = page.get("description", "")
+            result = WikiResult(key, page['title'], description)
             self.results.append(result)
             
     def print_results(self):
@@ -70,33 +76,42 @@ def print_usage():
     print("Usage: ")
     print("q: Search for an article.")
 
+def summarize(content: str) -> str:
+    result = replicate.run(
+        'meta/meta-llama-3-70b-instruct',
+        input={
+            'prompt': "Summarize the following in 300 words: " + content,
+        })
+    res = ''
+    for item in result:
+        res += item
+    return res
+
 def printHtml(content: str):
-    markdown = md(content)
+    markdown = md(content).strip()
     with open("output.md", "w") as f:
         f.write(markdown)
     formatted = mdv.main(markdown)
     print(formatted)
-    
+
 def query(q):
-    search = WikiSearch()
-    search.search(q)
-    
-    sorted = enumerate(search.get_results())
-    
-    for i, result in sorted:
+    search = wiki.search(q)
+    for i, result in enumerate(search):
         print(str(i) + ". " + str(result))
         
     index = input("Enter the index of the article you want to read: ")
     print("Opening article " + str(index))
-    pageid = search.get_results()[int(index)].pageid
     
-    wiki_page = WikiPage(pageid)
-    wiki_page.fetch_content()
-    printHtml(wiki_page.get_content())
+    wiki_page = wiki.page(search[int(index)])
+    content = wiki_page.get_content().replace("= ", "# ")
+    while content.find("=#") != -1:
+        content = content.replace("=#", "##")
     
+    while content.find(" =") != -1:
+        content = content.replace(" =", " ")
+    printHtml("# " + wiki_page.title + "\n\n" + content)
     
-    
-    
+
 
 if __name__ == "__main__":
     print_usage()
