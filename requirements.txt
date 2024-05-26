@@ -1,0 +1,7 @@
+markdownify
+rich
+nlpia2-wikipedia
+python-dotenv
+replicate
+requests
+mdv

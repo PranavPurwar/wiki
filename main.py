@@ -1,12 +1,18 @@
 from markdownify import markdownify as md
 from wikipedia import wikipedia as wiki
 from dotenv import load_dotenv
+from rich import print as rprint
+from rich.console import Console
+from rich.markdown import Markdown
 
 import replicate
 import requests
 import mdv
+import re
 
 load_dotenv()
+
+console = Console()
 
 class WikiResult:
     def __init__(self, pageid, title, description):
@@ -35,7 +41,7 @@ class WikiSearch:
 
         for key in pages:
             if pages[key]['pageid'] == -1:
-                print("No results found.")
+                console.print("[red bold]No results found.", style="red bold")
                 return
             page = pages[key]
             description = page.get("description", "")
@@ -87,17 +93,25 @@ def summarize(content: str) -> str:
         res += item
     return res
 
+def remove_empty_headings(text):
+  pattern_to_remove = re.compile(r'##(.*)\n\n\n')
+  return pattern_to_remove.sub('', text)
+
+
 def printHtml(content: str):
-    markdown = md(content).strip()
+    markdown = remove_empty_headings(md(content).strip())
     with open("output.md", "w") as f:
         f.write(markdown)
-    formatted = mdv.main(markdown)
-    print(formatted)
+    formatted = mdv.main(markdown, tab_length=8).replace('0m\n', '0m\n\n\n')
+    with open("formatted.md", "w") as f:
+        f.write(formatted)
+    markdown = Markdown(formatted)
+    console.print(markdown)
 
 def query(q):
     search = wiki.search(q)
     for i, result in enumerate(search):
-        print(str(i) + ". " + str(result))
+        rprint(str(i) + ". " + str(result))
         
     index = input("Enter the index of the article you want to read: ")
     print("Opening article " + str(index))
